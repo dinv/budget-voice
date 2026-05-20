@@ -110,6 +110,24 @@ body { font-family: system-ui, sans-serif; background: #0d0f1a; color: #e2e8f0; 
 </div>
 
 <script>
+const VALID_KEY = 'xK9m2vPqL4nR';
+
+// Check URL for key, save to localStorage if valid
+const urlKey = new URLSearchParams(window.location.search).get('key');
+if (urlKey === VALID_KEY) {
+  localStorage.setItem('bv_key', VALID_KEY);
+}
+const isUnlocked = localStorage.getItem('bv_key') === VALID_KEY;
+
+if (!isUnlocked) {
+  document.querySelector('.mic-btn').disabled = true;
+  document.querySelector('.mic-btn').style.opacity = '0.3';
+  document.querySelector('.mic-btn').style.cursor = 'not-allowed';
+  document.querySelector('.mic-btn').onclick = null;
+  document.getElementById('status').textContent = 'Access restricted';
+  document.getElementById('status').className = 'status error';
+}
+
 let recognition = null;
 let listening = false;
 let history = JSON.parse(localStorage.getItem('bv_history') || '[]');
@@ -144,6 +162,7 @@ function parseEntry(text) {
 }
 
 function toggleListening() {
+  if (!isUnlocked) return;
   if (listening) {
     stopListening();
   } else {
