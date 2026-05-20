@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget Voice</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #0d0f1a; color: #e2e8f0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.container { width: 100%; max-width: 360px; }
+.title { font-size: 15px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px; text-align: center; }
+.subtitle { font-size: 11px; color: #475569; text-align: center; margin-bottom: 32px; }
+
+.mic-btn { width: 120px; height: 120px; border-radius: 50%; border: none; background: linear-gradient(135deg, #3b82f6, #6366f1); cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 44px; transition: all .2s; box-shadow: 0 0 0 0 rgba(99,102,241,0.4); }
+.mic-btn:hover { opacity: .9; transform: scale(1.04); }
+.mic-btn.listening { animation: pulse 1.2s infinite; background: linear-gradient(135deg, #ef4444, #f97316); }
+@keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.4); } 50% { box-shadow: 0 0 0 18px rgba(239,68,68,0); } }
+
+.status { text-align: center; font-size: 13px; color: #475569; min-height: 20px; margin-bottom: 20px; }
+.status.listening { color: #f97316; }
+.status.success { color: #4ade80; }
+.status.error { color: #f87171; }
+
+.result-card { background: #141725; border: 1px solid #1e2340; border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; display: none; }
+.result-card.visible { display: block; }
+.result-label { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; }
+.result-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.result-item { font-size: 15px; color: #e2e8f0; font-weight: 500; flex: 1; }
+.result-amount { font-size: 15px; color: #4ade80; font-weight: 600; font-family: monospace; }
+
+.copy-btn { width: 100%; padding: 12px; border-radius: 8px; border: none; background: linear-gradient(135deg, #3b82f6, #6366f1); color: #fff; font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit; transition: opacity .15s; margin-bottom: 8px; display: none; }
+.copy-btn.visible { display: block; }
+.copy-btn:hover { opacity: .88; }
+.copy-btn.copied { background: linear-gradient(135deg, #16a34a, #15803d); }
+
+.edit-row { display: flex; gap: 8px; margin-bottom: 12px; display: none; }
+.edit-row.visible { display: flex; }
+.edit-input { flex: 1; font-size: 13px; padding: 7px 10px; border-radius: 6px; border: 1px solid #1e2340; background: #0d0f1a; color: #e2e8f0; font-family: inherit; }
+.edit-input:focus { outline: none; border-color: #334155; }
+.edit-amount { width: 90px; font-family: monospace; }
+
+.history { margin-top: 20px; }
+.history-label { font-size: 10px; color: #334155; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.history-label::after { content: ''; flex: 1; height: 1px; background: #1e2340; }
+.history-item { display: flex; justify-content: space-between; font-size: 12px; color: #475569; padding: 5px 0; border-bottom: 1px solid #1e2340; }
+.history-item:last-child { border-bottom: none; }
+.history-amount { color: #4ade80; font-family: monospace; }
+.clear-btn { font-size: 10px; color: #334155; background: none; border: none; cursor: pointer; float: right; }
+.clear-btn:hover { color: #475569; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">💬 Budget Voice</div>
+  <div class="subtitle">Tap · Speak · Send to Sheets</div>
+
+  <div style="margin-bottom:20px;text-align:center;">
+    <select id="monthSelect" style="font-size:13px;padding:6px 10px;border-radius:6px;border:1px solid #1e2340;background:#141725;color:#e2e8f0;font-family:inherit;outline:none;">
+      <option>January</option><option>February</option><option>March</option>
+      <option>April</option><option selected>May</option><option>June</option>
+      <option>July</option><option>August</option><option>September</option>
+      <option>October</option><option>November</option><option>December</option>
+    </select>
+  </div>
+
+  <button class="mic-btn" id="micBtn" onclick="toggleListening()">🎙️</button>
+  <div class="status" id="status">Tap to speak</div>
+
+  <div class="result-card" id="resultCard">
+    <div class="result-label">Parsed entry</div>
+    <div class="result-row">
+      <span class="result-item" id="resultItem">—</span>
+      <span class="result-amount" id="resultAmount">—</span>
+    </div>
+  </div>
+
+  <div class="edit-row" id="editRow">
+    <input class="edit-input" id="editItem" placeholder="Item" oninput="updateResult()">
+    <input class="edit-input edit-amount" id="editAmount" placeholder="$0.00" oninput="updateResult()">
+  </div>
+
+  <!-- Name+amount: discretionary only -->
+  <button class="copy-btn" id="btnDiscretionary" onclick="sendToSheets('discretionary')" style="display:none;background:linear-gradient(135deg,#f97316,#ef4444);">📤 Send to Discretionary</button>
+
+  <!-- Amount only: gas or groceries -->
+  <div id="amountBtns" style="display:none;gap:8px;flex-direction:column;">
+    <button class="copy-btn" style="display:block;background:linear-gradient(135deg,#3b82f6,#6366f1);margin-bottom:0;" onclick="sendToSheets('gas')">⛽ Send to Gas</button>
+    <button class="copy-btn" style="display:block;background:linear-gradient(135deg,#16a34a,#15803d);margin-bottom:0;" onclick="sendToSheets('groceries')">🛒 Send to Groceries</button>
+  </div>
+
+  <div id="sendStatus" style="text-align:center;font-size:13px;min-height:20px;margin-top:12px;"></div>
+
+  <div class="history" id="historyWrap" style="display:none">
+    <div class="history-label">Recent <button class="clear-btn" onclick="clearHistory()">clear</button></div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<script>
+let recognition = null;
+let listening = false;
+let history = JSON.parse(localStorage.getItem('bv_history') || '[]');
+let currentItem = '';
+let currentAmount = '';
+
+function parseEntry(text) {
+  text = text.toLowerCase().trim();
+  const amountMatch = text.match(/(\d+\.?\d*)\s*(?:dollars?|bucks?)?/);
+  if (!amountMatch) return null;
+  let amount = parseFloat(amountMatch[1]);
+  // Fix "eleven twenty one" → 1121 → 11.21
+  // If whole number with 3-4 digits, likely dollars+cents spoken separately
+  if(Number.isInteger(amount) && amount >= 100 && amount <= 9999) {
+    const s = String(Math.round(amount));
+    const dollars = parseInt(s.slice(0, s.length-2));
+    const cents = parseInt(s.slice(-2));
+    if(cents < 100) amount = dollars + cents/100;
+  }
+
+  // Remove the amount to get item name
+  let item = text
+    .replace(/\$?\d+\.?\d*\s*(?:dollars?|bucks?)?/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Number-only command — no item text
+  if (!item) return { item: '', amount: amount.toFixed(2), numberOnly: true };
+
+  item = item.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  return { item, amount: amount.toFixed(2), numberOnly: false };
+}
+
+function toggleListening() {
+  if (listening) {
+    stopListening();
+  } else {
+    startListening();
+  }
+}
+
+function startListening() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    setStatus('Speech not supported in this browser', 'error');
+    return;
+  }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = 'en-US';
+
+  recognition.onstart = () => {
+    listening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micBtn').textContent = '⏹';
+    setStatus('Listening...', 'listening');
+  };
+
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    processTranscript(transcript);
+  };
+
+  recognition.onerror = (e) => {
+    setStatus('Could not hear — try again', 'error');
+    stopListening();
+  };
+
+  recognition.onend = () => { stopListening(); };
+  recognition.start();
+}
+
+function stopListening() {
+  listening = false;
+  if (recognition) recognition.stop();
+  document.getElementById('micBtn').classList.remove('listening');
+  document.getElementById('micBtn').textContent = '🎙️';
+  if (document.getElementById('status').textContent === 'Listening...') {
+    setStatus('Tap to speak');
+  }
+}
+
+function processTranscript(text) {
+  const parsed = parseEntry(text);
+  if (!parsed) {
+    setStatus(`Heard: "${text}" — couldn't parse`, 'error');
+    return;
+  }
+  currentItem = parsed.item;
+  currentAmount = parsed.amount;
+  showResult(parsed.item, '$' + parsed.amount, parsed.numberOnly);
+  setStatus(`Heard: "${text}"`, 'success');
+}
+
+function showResult(item, amount, numberOnly=false) {
+  document.getElementById('resultItem').textContent = numberOnly ? '(amount only)' : item;
+  document.getElementById('resultAmount').textContent = amount;
+  document.getElementById('resultCard').classList.add('visible');
+  document.getElementById('editItem').value = item;
+  document.getElementById('editAmount').value = amount;
+  document.getElementById('editRow').classList.add('visible');
+  document.getElementById('sendStatus').textContent = '';
+
+  if (numberOnly) {
+    // Amount only — show gas/groceries buttons
+    document.getElementById('btnDiscretionary').style.display = 'none';
+    document.getElementById('amountBtns').style.display = 'flex';
+  } else {
+    // Name + amount — show discretionary button
+    document.getElementById('btnDiscretionary').style.display = 'block';
+    document.getElementById('amountBtns').style.display = 'none';
+  }
+}
+
+async function sendToSheets(category) {
+  const item   = document.getElementById('editItem').value.trim();
+  const amount = document.getElementById('editAmount').value.replace('$','').trim();
+  const month  = document.getElementById('monthSelect').value;
+  const statusEl = document.getElementById('sendStatus');
+
+  statusEl.style.color = '#475569';
+  statusEl.textContent = 'Sending...';
+
+  try {
+    const res = await fetch('https://lead-capture-production-11b8.up.railway.app/log-budget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, item, amount: parseFloat(amount).toFixed(2), month })
+    });
+
+    if (res.ok) {
+      statusEl.style.color = '#4ade80';
+      statusEl.textContent = `✓ Added to ${month} → ${category}`;
+
+      // Save to history
+      history.unshift({ item: item || category, amount: '$'+parseFloat(amount).toFixed(2), time: new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) });
+      if (history.length > 8) history = history.slice(0, 8);
+      localStorage.setItem('bv_history', JSON.stringify(history));
+      renderHistory();
+    } else {
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = 'Something went wrong — try again';
+    }
+  } catch(e) {
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Could not connect';
+  }
+}
+
+function setStatus(msg, type='') {
+  const s = document.getElementById('status');
+  s.textContent = msg;
+  s.className = 'status ' + type;
+}
+
+function clearHistory() {
+  history = [];
+  localStorage.removeItem('bv_history');
+  renderHistory();
+}
+
+function renderHistory() {
+  if (!history.length) {
+    document.getElementById('historyWrap').style.display = 'none';
+    return;
+  }
+  document.getElementById('historyWrap').style.display = 'block';
+  document.getElementById('historyList').innerHTML = history.map(h =>
+    `<div class="history-item"><span>${h.item}</span><span class="history-amount">${h.amount} <span style="color:#334155">${h.time}</span></span></div>`
+  ).join('');
+}
+
+renderHistory();
+</script>
+</body>
+</html>
