@@ -254,7 +254,7 @@ async function sendToSheets(category) {
   statusEl.textContent = 'Sending...';
 
   try {
-    const res = await fetch('https://lead-capture-production-11b8.up.railway.app/log-budget', {
+    const res = await fetch('https://web-production-36eef.up.railway.app/log-budget', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ category, item, amount: parseFloat(amount).toFixed(2), month })
