@@ -116,7 +116,6 @@ if (urlKey) {
   localStorage.setItem('bv_key', urlKey);
 }
 const writeKey = localStorage.getItem('bv_key');
-document.getElementById('status').textContent = 'Key: ' + writeKey;
 
 if (!writeKey) {
   document.querySelector('.mic-btn').disabled = true;
