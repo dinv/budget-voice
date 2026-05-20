@@ -110,16 +110,14 @@ body { font-family: system-ui, sans-serif; background: #0d0f1a; color: #e2e8f0; 
 </div>
 
 <script>
-const VALID_KEY = 'xK9m2vPqL4nR';
-
-// Check URL for key, save to localStorage if valid
+// Check URL for write key, save to localStorage if present
 const urlKey = new URLSearchParams(window.location.search).get('key');
-if (urlKey === VALID_KEY) {
-  localStorage.setItem('bv_key', VALID_KEY);
+if (urlKey) {
+  localStorage.setItem('bv_key', urlKey);
 }
-const isUnlocked = localStorage.getItem('bv_key') === VALID_KEY;
+const writeKey = localStorage.getItem('bv_key');
 
-if (!isUnlocked) {
+if (!writeKey) {
   document.querySelector('.mic-btn').disabled = true;
   document.querySelector('.mic-btn').style.opacity = '0.3';
   document.querySelector('.mic-btn').style.cursor = 'not-allowed';
@@ -162,7 +160,7 @@ function parseEntry(text) {
 }
 
 function toggleListening() {
-  if (!isUnlocked) return;
+  if (!writeKey) return;
   if (listening) {
     stopListening();
   } else {
@@ -257,7 +255,7 @@ async function sendToSheets(category) {
     const res = await fetch('https://web-production-36eef.up.railway.app/log-budget', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category, item, amount: parseFloat(amount).toFixed(2), month })
+      body: JSON.stringify({ category, item, amount: parseFloat(amount).toFixed(2), month, key: writeKey })
     });
 
     if (res.ok) {
